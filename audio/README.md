@@ -9,8 +9,8 @@ browser USB receiver. It does not stream key events or play a prerecorded song.
    AppVars and archived LibLoad / USBDRVCE are reused.
 2. Exit the old emulator, run **TIBUSB6**, then load your game.
 3. Quit TI Connect CE and connect **TI-Boy CE PCM6** on the updated Doomvision
-   `/usb` page. The default is **Fast · 4 kHz**. The website can change between
-   4, 8 and 16 kHz while the game runs; lower rates leave more CPU for gameplay.
+   `/usb` page. The default is **Fast · 4 kHz**. The verified setting is Fast 4 kHz. Higher-rate website choices are disabled
+   because live hardware acknowledged the vendor request without switching rates.
    All four sound channels and PCM generation remain on the calculator.
 4. The browser flushes startup backlog before playback and resets the queue
    during a rate change. Expect a brief rebuffer when changing quality.
@@ -29,8 +29,10 @@ transforms, checked against the reference, rather than approximated noise.
 Fast mode delivers 4,000 samples/s = 31.25 packets/s. Balanced mode is 8,000
 samples/s = 62.5 packets/s. High mode is 16,000 samples/s = 125 packets/s.
 Each packet carries its actual source rate. The browser only plays packets at
-the selected rate and clears old data at changes. Physical playable-speed and
-rate-control verification for PCM6 remains pending.
+the selected rate and clears old data at changes. A direct PCM6 Fast-mode capture measured approximately 4,004 PCM samples/s
+with zero missing chunks and a 47.2 ms maximum packet gap. Higher-rate vendor
+requests were acknowledged but did not change the physical output from 4 kHz;
+the browser disables those choices. Playable game-speed confirmation is pending.
 
 Vendor control OUT (device recipient), request 0x51, wValue 4000/8000/16000,
 wIndex 0, zero payload selects the rate. The control callback acknowledges the
