@@ -45,6 +45,10 @@
 #endmacro
 #endif
 
+#ifdef USB_AUDIO
+#include "build/audio/symbols.inc"
+#endif
+
 #define CALL_STACK_DEPTH 32
 #define CALL_STACK_ENTRY_SIZE_Z80 4
 #define CALL_STACK_ENTRY_SIZE_ADL 3
@@ -1750,7 +1754,11 @@ MetaHeader:
 	.db "TIBOYCE",0
 ; The name of the appvar itself.
 SelfName:
+#ifdef USB_AUDIO
+    .db appVarObj,"TBUSBDat"
+#else
 	.db appVarObj,"TIBoyDat"
+#endif
 	
 ; The backup of SP before beginning emulation.
 saveSP:
@@ -2029,6 +2037,15 @@ screenRotationParam:
 	#include "waitloop.asm"
 	#include "lzf.asm"
 	
+#ifdef USB_AUDIO
+    #include "audio/bridge.asm"
+    #if $ > $D1E881
+        .error "Emulator code overlaps fixed audio module"
+    #endif
+    .block $D1E881-$
+    #import "build/audio/module.bin"
+#endif
+
 	.echo "User RAM code size: ", $ - program_start
 
 ; The RAM program ends here.

@@ -43,7 +43,11 @@ tAsm84CeCmp = $7B
 ExeName:
 	.db appVarObj
 ErrorStartText:
+#ifdef USB_AUDIO
+    .db "TBUSBDat"
+#else
 	.db "TIBoyDat"
+#endif
 	.db " "
 	.db "Invalid",0
 	.db "Missing",0

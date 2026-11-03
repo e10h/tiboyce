@@ -15,3 +15,6 @@ Debug/
 Release/
 tiboyce-romgen/romgen
 tiboyce-convertsav/convertsav
+
+# Generated fixed-address audio extension and benchmark artifacts
+build/

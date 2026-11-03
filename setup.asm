@@ -2,6 +2,9 @@ Startup:
 	ld bc,-arc_start
 	add hl,bc
 	ld (ArcBase),hl
+#ifdef USB_AUDIO
+	call AudioResolve
+#endif
 
 	; Align user memory so GBC VRAM is 16-byte aligned
 	ld hl,(asm_prgm_size)
@@ -1983,6 +1986,9 @@ SetupLoadStateNoGBC:
 	
 	ACALL(SetScalingMode)
 	
+#ifdef USB_AUDIO
+    call AudioStart
+#endif
 	call flush_code_reset_padding
 
 	; Generate the initial code block
@@ -2202,6 +2208,9 @@ _
 	ldir
 	
 ExitEmulationWithoutState:
+#ifdef USB_AUDIO
+	call AudioStop
+#endif
 	; Handle RTC saving
 	ld a,(cram_size)
 	or a
@@ -3556,6 +3565,9 @@ RestoreOriginalLcdSettings:
 	ld de,vRam
 	ACALL(SetLcdSettings)
 RestoreOriginalHardwareSettings:
+#ifdef USB_AUDIO
+	call AudioStop
+#endif
 	ld iy,flags
 	ld ix,originalHardwareSettings
 	scf

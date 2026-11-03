@@ -9,6 +9,9 @@
 ; Outputs: None
 ; Destroys AF,HL
 vblank_helper:
+#ifdef USB_AUDIO
+	call AudioFrame
+#endif
 	; Update emulated frame counter
 frame_emulated_count = $+1
 	ld hl,0
