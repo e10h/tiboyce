@@ -34,8 +34,10 @@ the browser disables those choices for PCM6. The user confirmed perfect
 gameplay in Fast mode. PCM7 fixes the control handler by taking the validated
 rate directly from the accepted setup request, rather than relying on the
 legacy driver's zero-length callback data layout. Both callback layouts are
-covered by the host regression test. Physical PCM7 rate-switch verification
-is pending.
+covered by the host regression test. Physical PCM7 switching was verified on 2026-11-03: 8 kHz measured
+7,998 samples/s (maximum packet gap 31.5 ms), 16 kHz measured 15,959 samples/s
+(27.6 ms), and restoring 4 kHz measured 3,990 samples/s (45.7 ms). All three
+captures had zero missing chunks and the expected rate in the PCM headers.
 
 Vendor control OUT (device recipient), request 0x51, wValue 4000/8000/16000,
 wIndex 0, zero payload selects the rate. Once scheduling the control acknowledgement succeeds, the accepted rate is
