@@ -48,3 +48,11 @@ AudioFrame:
 AudioStop:
     AUDIO_CALL(tba_stop)
     ret
+
+; Called from Z80-mode event dispatch using CALL.IL; RET.L restores that mode.
+AudioPollZ80:
+    AUDIO_CALL(tba_poll)
+    ret.l
+AudioPoll:
+    AUDIO_CALL(tba_poll)
+    ret

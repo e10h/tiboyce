@@ -99,6 +99,7 @@ do_event_any_noassert:
 	jr nz,$
 #endif
 do_event_pushed:
+
 	push de
 #ifdef SCHEDULER_LOG
 	 call.il scheduler_log
@@ -126,6 +127,15 @@ event_expired_interrupt_loop:
 event_expired_halt_loop:
 	 ld hl,i ; This clears the carry flag
 event_expired_loop:
+#ifdef USB_AUDIO
+    push.l af
+    ld a,(audio_poll_divider)
+    inc a
+    ld (audio_poll_divider),a
+    and 7
+    call.il z,AudioPollZ80
+    pop.l af
+#endif
 	 ld sp,event_counter_checkers
 
 	 ld b,h
@@ -648,3 +658,9 @@ _
 schedule_event_finish_no_schedule:
 	 ld a,c
 	 jr -_
+
+#ifdef USB_AUDIO
+; One lightweight USB poll per eight event-dispatch entries.
+audio_poll_divider:
+    .db 0
+#endif

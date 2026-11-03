@@ -24,9 +24,9 @@ static Slot slots[8];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0201,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0202,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM2"};
+static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM3"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};
@@ -51,6 +51,7 @@ static void packet(void){unsigned int i;assembling[0]='D';assembling[1]='V';asse
         break;
     }
 }
+void tba_poll(void){if(started)usb_HandleEvents();}
 void tba_frame(void){uint8_t regs[0x30]={0},wave[16];unsigned int i,n;
     if(!started)return;
     usb_HandleEvents();

@@ -460,7 +460,19 @@ wait_for_interrupt:
 	ex de,hl
 	ld hl,z80codebase+rst38h
 	ld (hl),$C9	;RET
+#ifdef USB_AUDIO
+    ; Do not halt for an entire LCD frame while bulk transfers need servicing.
+    push hl
+AudioWaitForInterrupt:
+    call AudioPoll
+    ld hl,(mpIntMaskedStatus)
+    ld a,l
+    or h
+    jr z,AudioWaitForInterrupt
+    pop hl
+#else
 	call.is wait_for_interrupt_stub
+#endif
 	ld (hl),$D9	;EXX
 	ex de,hl
 	ld (hl),bc
