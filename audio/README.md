@@ -1,29 +1,34 @@
-# TI-Boy CE USB audio — experimental prototype 3
+# TI-Boy CE USB audio — experimental prototype 4
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **both** `TIBUSB3.8xp` and `TBUSBDat.8xv` from `build/usb-audio/`.
+1. Transfer **both** `TIBUSB4.8xp` and `TBUSB004.8xv` from `build/usb-audio/`.
    These have separate names from the stock launcher/core. Existing converted
    game AppVars are reused. LibLoad and USBDRVCE must already be installed and
    archived (the same libraries used by DVUSB6).
-2. Run **TIBUSB3** and load your game. The emulator initializes USB when the
+2. Run **TIBUSB4** and load your game. The emulator initializes USB when the
    game starts; reconnect the USB cable after starting the game if needed.
 3. Close TI Connect CE and any native Doomvision receiver. Open the updated
    Doomvision `/usb` page in Chrome on Mac, click Connect calculator, choose
-   **TI-Boy CE PCM3**, then Connect. The mode should read **Game Boy**.
+   **TI-Boy CE PCM4**, then Connect. The mode should read **Game Boy**.
 4. Exiting emulation or entering a menu cleans up USB before TI-OS file calls.
    After resuming, reconnect from the browser if it disconnected.
 
-Prototype 1 ran a game and streamed on a physical calculator, but its fixed audio
-sample budget per emulated frame starved browser playback when the game slowed.
-Prototype 2 generates samples from elapsed USB SOF time, but still underruns on
-physical hardware: polling only near VBlank starves the controller FIFO.
-Prototype 3 also polls between event dispatches and while waiting for LCD sync.
-Both native and mixed Z80/ADL poll bridges are checked with the ROM-free CPU.
-Physical verification of continuous playback with prototype 3 is pending.
+A live descriptor read and 12-second raw USB capture confirmed the running
+hardware was PCM1, delivering about 27 chunks/s (3,526 PCM samples/s), rather
+than the required 125 chunks/s. Prior reported tests of prototypes 2/3 were not
+verified against their live firmware identities because the builds shared one
+core name. They are not evidence that their changes ran on that calculator.
+
+Prototype 4 gives both files distinct names: TIBUSB4 loads TBUSB004. It retains
+USB-clock sample pacing and USB polling between scheduler events and during LCD
+waits. The package checks the launcher's core target, the AppVar name, and the
+core SelfName field. The browser displays the selected device name and rejects
+PCM1–3 with instructions to run TIBUSB4. Continuous physical PCM4 playback is
+still awaiting validation.
 
 ## Current accuracy and performance limits
 

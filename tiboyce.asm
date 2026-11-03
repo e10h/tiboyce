@@ -1,3 +1,7 @@
+#ifndef USB_CORE_NAME
+#define USB_CORE_NAME "TBUSBDat"
+#endif
+
 #ifndef VERSION
 ; "*" indicates a potentially modified, or "dirty" in Git terminology, version.
 #define VERSION "v0.3.0*"
@@ -1755,7 +1759,7 @@ MetaHeader:
 ; The name of the appvar itself.
 SelfName:
 #ifdef USB_AUDIO
-    .db appVarObj,"TBUSBDat"
+    .db appVarObj,USB_CORE_NAME
 #else
 	.db appVarObj,"TIBoyDat"
 #endif

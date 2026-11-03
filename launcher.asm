@@ -1,3 +1,7 @@
+#ifndef USB_CORE_NAME
+#define USB_CORE_NAME "TBUSBDat"
+#endif
+
 ; Some standalone equates
 _Mov9ToOP1 = $020320
 _chkFindSym = $02050C
@@ -44,7 +48,7 @@ ExeName:
 	.db appVarObj
 ErrorStartText:
 #ifdef USB_AUDIO
-    .db "TBUSBDat"
+    .db USB_CORE_NAME
 #else
 	.db "TIBoyDat"
 #endif
