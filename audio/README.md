@@ -1,19 +1,17 @@
-# TI-Boy CE USB audio — experimental prototype 6
+# TI-Boy CE USB audio — experimental prototype 7
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **TBAUD6.8xg**, which sends both TIBUSB6 and TBUSB006. Existing game
+1. Transfer **TBAUD7.8xg**, which sends both TIBUSB7 and TBUSB007. Existing game
    AppVars and archived LibLoad / USBDRVCE are reused.
-2. Exit the old emulator, run **TIBUSB6**, then load your game.
-3. Quit TI Connect CE and connect **TI-Boy CE PCM6** on the updated Doomvision
-   `/usb` page. The default is **Fast · 4 kHz**. The verified setting is Fast 4 kHz. Higher-rate website choices are disabled
-   because live hardware acknowledged the vendor request without switching rates.
-   All four sound channels and PCM generation remain on the calculator.
-4. The browser flushes startup backlog before playback and resets the queue
-   during a rate change. Expect a brief rebuffer when changing quality.
+2. Exit the old emulator, run **TIBUSB7**, then load your game.
+3. Quit TI Connect CE and connect **TI-Boy CE PCM7** on Doomvision `/usb` in
+   Chrome. Fast 4 kHz is the default. PCM7 enables live 8/16 kHz choices; PCM6
+   remains accepted in Fast-only mode. Higher rates cost more game CPU time.
+4. The browser discards startup backlog and briefly rebuffers on a rate change.
 
 ## Verification and CPU budget
 
@@ -32,11 +30,16 @@ Each packet carries its actual source rate. The browser only plays packets at
 the selected rate and clears old data at changes. A direct PCM6 Fast-mode capture measured approximately 4,004 PCM samples/s
 with zero missing chunks and a 47.2 ms maximum packet gap. Higher-rate vendor
 requests were acknowledged but did not change the physical output from 4 kHz;
-the browser disables those choices. Playable game-speed confirmation is pending.
+the browser disables those choices for PCM6. The user confirmed perfect
+gameplay in Fast mode. PCM7 fixes the control handler by taking the validated
+rate directly from the accepted setup request, rather than relying on the
+legacy driver's zero-length callback data layout. Both callback layouts are
+covered by the host regression test. Physical PCM7 rate-switch verification
+is pending.
 
 Vendor control OUT (device recipient), request 0x51, wValue 4000/8000/16000,
-wIndex 0, zero payload selects the rate. The control callback acknowledges the
-request; the pending change applies at a frame boundary, preserving oscillator
+wIndex 0, zero payload selects the rate. Once scheduling the control acknowledgement succeeds, the accepted rate is
+recorded and applies at a frame boundary, preserving oscillator
 phase and envelope progress. The sender stops spending CPU on discarded audio
 when its transfer ring is full because the host is not reading.
 

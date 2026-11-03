@@ -26,25 +26,28 @@ static Slot slots[SLOT_COUNT];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0205,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0206,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM6"};
+static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM7"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};
 static usb_error_t complete(usb_endpoint_t ep,usb_transfer_status_t status,size_t n,void *arg){(void)ep;(void)status;(void)n;((Slot*)arg)->busy=0;return USB_SUCCESS;}
-static usb_error_t rate_complete(usb_endpoint_t ep,usb_transfer_status_t status,size_t n,void *arg){(void)ep;(void)n;
-    if(status==USB_TRANSFER_COMPLETED)pending_rate=(uint16_t)(uintptr_t)arg;
-    return USB_SUCCESS;
+/* The legacy driver has a special zero-length control callback path. Keep
+   this acknowledgement independent of its callback argument layout. */
+static usb_error_t rate_complete(usb_endpoint_t ep,usb_transfer_status_t status,size_t n,void *arg){
+    (void)ep;(void)status;(void)n;(void)arg;return USB_SUCCESS;
 }
 static usb_error_t event(usb_event_t e,void *data,void *arg){(void)arg;
     if(e==USB_DEFAULT_SETUP_EVENT){
         const usb_control_setup_t *setup=data;
         if(setup->bmRequestType==0x40&&setup->bRequest==0x51&&setup->wIndex==0&&setup->wLength==0&&
            (setup->wValue==4000||setup->wValue==8000||setup->wValue==16000)){
+            uint16_t rate=setup->wValue;
             usb_device_t host=usb_FindDevice(NULL,NULL,USB_SKIP_HUBS);
-            usb_error_t error=usb_ScheduleControlTransfer(usb_GetDeviceEndpoint(host,0),setup,NULL,rate_complete,(void*)(uintptr_t)setup->wValue);
-            return error==USB_SUCCESS?USB_IGNORE:error;
+            usb_error_t error=usb_ScheduleControlTransfer(usb_GetDeviceEndpoint(host,0),setup,NULL,rate_complete,NULL);
+            if(error==USB_SUCCESS){pending_rate=rate;return USB_IGNORE;}
+            return error;
         }
     }
     if(e==USB_HOST_CONFIGURE_EVENT){usb_device_t host=usb_FindDevice(NULL,NULL,USB_SKIP_HUBS);endpoint=usb_GetDeviceEndpoint(host,0x81);if(endpoint)usb_SetEndpointFlags(endpoint,USB_AUTO_TERMINATE);position=0;clock_sync=1;}
