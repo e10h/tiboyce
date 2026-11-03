@@ -15,6 +15,57 @@
     ld de,(hl)
     add iy,de
 .endm
+.macro noise_jump n
+    ld a,(_tba_short)
+    or a,a
+    jr nz,.Lshort_jump\n
+    ld c,h
+    ld de,0
+    ld e,l
+    sla e
+    rl d
+    ld hl,.Lwide\n\()_lo
+    add hl,de
+    ld e,(hl)
+    inc hl
+    ld d,(hl)
+    push de
+    ld hl,0
+    ld l,c
+    add hl,hl
+    ld de,.Lwide\n\()_hi
+    add hl,de
+    ld e,(hl)
+    inc hl
+    ld d,(hl)
+    pop hl
+    ld a,l
+    xor e
+    ld l,a
+    ld a,h
+    xor d
+    ld h,a
+    jr .Ljump_done\n
+.Lshort_jump\n:
+    ld a,l
+    and 127
+    ld de,0
+    ld e,a
+    sla e
+    rl d
+    ld hl,.Lshort\n
+    add hl,de
+    ld e,(hl)
+    inc hl
+    ld d,(hl)
+    ex de,hl
+.Ljump_done\n:
+    ld a,b
+    sub \n
+    ld b,a
+    jp z,.Lnoise_done
+    jp .Lnoise_blocks
+.endm
 _tba_fast_mix:
     push ix
     push iy
@@ -38,8 +89,18 @@ _tba_fast_mix:
     ld (_tba_phase+11),a
     ld hl,(_tba_noise)
     or a,b
-    jr z,.Lnoise_done
+    jp z,.Lnoise_done
 .Lnoise_blocks:
+    ld a,b
+    cp 128
+    jr c,.Ltry32
+    noise_jump 128
+.Ltry32:
+    ld a,b
+    cp 32
+    jr c,.Ltry8
+    noise_jump 32
+.Ltry8:
     ld a,b
     cp 8
     jr c,.Lnoise_tail
@@ -78,12 +139,12 @@ _tba_fast_mix:
     ld a,b
     sub 8
     ld b,a
-    jr nz,.Lnoise_blocks
-    jr .Lnoise_done
+    jp nz,.Lnoise_blocks
+    jp .Lnoise_done
 .Lnoise_tail:
     ld a,b
     or a,a
-    jr z,.Lnoise_done
+    jp z,.Lnoise_done
 .Lnoise:
     ld a,l
     rrca
@@ -128,7 +189,7 @@ _tba_fast_mix:
     dec a
     ld (.Lpoll_count),a
     jr nz,.Lno_poll
-    ld a,16
+    ld a,(_tba_poll_interval)
     ld (.Lpoll_count),a
     push ix
     push iy
@@ -160,3 +221,5 @@ _tba_fast_mix:
  .byte 120,185,59,250,254,63,189,124,116,181,55,246,242,51,177,112
  .byte 80,145,19,210,214,23,149,84,92,157,31,222,218,27,153,88
  .byte 72,137,11,202,206,15,141,76,68,133,7,198,194,3,129,64
+
+.include "audio/noise-jumps.inc"

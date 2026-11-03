@@ -19,33 +19,47 @@ static uint32_t sequence;
 static uint16_t position;
 static unsigned int last_usb_tick;
 static uint8_t clock_sync;
+static uint16_t pending_rate;
 typedef struct { uint8_t data[272],busy; } Slot;
 #define SLOT_COUNT 24
 static Slot slots[SLOT_COUNT];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0204,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0205,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM5"};
+static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM6"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};
 static usb_error_t complete(usb_endpoint_t ep,usb_transfer_status_t status,size_t n,void *arg){(void)ep;(void)status;(void)n;((Slot*)arg)->busy=0;return USB_SUCCESS;}
-static usb_error_t event(usb_event_t e,void *data,void *arg){(void)data;(void)arg;
+static usb_error_t rate_complete(usb_endpoint_t ep,usb_transfer_status_t status,size_t n,void *arg){(void)ep;(void)n;
+    if(status==USB_TRANSFER_COMPLETED)pending_rate=(uint16_t)(uintptr_t)arg;
+    return USB_SUCCESS;
+}
+static usb_error_t event(usb_event_t e,void *data,void *arg){(void)arg;
+    if(e==USB_DEFAULT_SETUP_EVENT){
+        const usb_control_setup_t *setup=data;
+        if(setup->bmRequestType==0x40&&setup->bRequest==0x51&&setup->wIndex==0&&setup->wLength==0&&
+           (setup->wValue==4000||setup->wValue==8000||setup->wValue==16000)){
+            usb_device_t host=usb_FindDevice(NULL,NULL,USB_SKIP_HUBS);
+            usb_error_t error=usb_ScheduleControlTransfer(usb_GetDeviceEndpoint(host,0),setup,NULL,rate_complete,(void*)(uintptr_t)setup->wValue);
+            return error==USB_SUCCESS?USB_IGNORE:error;
+        }
+    }
     if(e==USB_HOST_CONFIGURE_EVENT){usb_device_t host=usb_FindDevice(NULL,NULL,USB_SKIP_HUBS);endpoint=usb_GetDeviceEndpoint(host,0x81);if(endpoint)usb_SetEndpointFlags(endpoint,USB_AUTO_TERMINATE);position=0;clock_sync=1;}
     else if(e==USB_DEVICE_DISCONNECTED_EVENT||e==USB_DEVICE_DISABLED_EVENT)endpoint=NULL;
     return USB_SUCCESS;
 }
 void tba_stop(void){if(started){usb_Cleanup();started=0;}endpoint=NULL;}
 void tba_start(void){
-    tba_apu_reset(&apu);sequence=0;position=0;endpoint=NULL;
+    tba_apu_reset(&apu);tba_apu_set_rate(&apu,4000);pending_rate=0;sequence=0;position=0;endpoint=NULL;
     memset(slots,0,sizeof(slots));memset(assembling,0,sizeof(assembling));
     if(tba_loaded&&!started)started=usb_Init(event,NULL,&descriptors,USB_DEFAULT_INIT_FLAGS)==USB_SUCCESS;
 }
 static void packet(void){unsigned int i;assembling[0]='D';assembling[1]='V';assembling[2]='U';assembling[3]='1';
     memcpy(assembling+4,&sequence,4);sequence++;
-    assembling[8]=0x80;assembling[9]=0x3e;assembling[10]=assembling[11]=0;
+    assembling[8]=(uint8_t)apu.rate;assembling[9]=apu.rate>>8;assembling[10]=assembling[11]=0;
     assembling[12]=128;assembling[13]=0;assembling[14]=4;assembling[15]=0;
     for(i=0;i<SLOT_COUNT;i++)if(!slots[i].busy){Slot *s=&slots[i];memcpy(s->data,assembling,272);s->busy=1;
         if(usb_ScheduleBulkTransfer(endpoint,s->data,272,complete,s)!=USB_SUCCESS)s->busy=0;
@@ -65,6 +79,11 @@ void tba_frame(void){uint8_t regs[0x30]={0},wave[16];unsigned int i,n;
     if(!started)return;
     usb_HandleEvents();
     if(!endpoint||!tba_regs_ptr)return;
+    /* A full ring means the host is not draining audio. Save game CPU instead
+       of synthesizing samples that would immediately be discarded. */
+    for(i=0;i<SLOT_COUNT;i++)if(!slots[i].busy)break;
+    if(i==SLOT_COUNT){clock_sync=1;return;}
+    if(pending_rate){tba_apu_set_rate(&apu,pending_rate);pending_rate=0;position=0;clock_sync=1;}
     for(i=0;i<22;i++)regs[i]=tba_regs_ptr[i];
     /* Consume trigger latches; TI-Boy keeps CPU-visible masked values separately. */
     for(i=4;i<20;i+=5)tba_regs_ptr[i]&=0x7f;
@@ -74,10 +93,11 @@ void tba_frame(void){uint8_t regs[0x30]={0},wave[16];unsigned int i,n;
        16 kHz samples per unit even when emulation falls below 59.7 fps. */
     unsigned int now=usb_GetFrameNumber()&0x3ff8;
     if(clock_sync){last_usb_tick=now;clock_sync=0;return;}
-    n=((now-last_usb_tick)&0x3fff)*2;last_usb_tick=now;
+    n=(now-last_usb_tick)&0x3fff;last_usb_tick=now;
+    if(apu.rate==4000)n/=2;else if(apu.rate==16000)n*=2;
     /* Long pauses are discontinuities, not an unbounded audio backlog. */
-    if(n>2048)n=1024;
-    while(n){unsigned int count=n>268?268:n;
+    if(n>apu.rate/8)n=apu.rate/16;
+    while(n){unsigned int max=apu.rate==4000?64:apu.rate==8000?128:256;unsigned int count=n>max?max:n;
         tba_apu_render(&apu,frame_pcm,count);
         for(i=0;i<count;i++){int16_t sample=frame_pcm[i];assembling[16+position*2]=(uint8_t)sample;assembling[17+position*2]=(uint16_t)sample>>8;
             if(++position==128){packet();position=0;usb_HandleEvents();}

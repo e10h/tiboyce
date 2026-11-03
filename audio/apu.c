@@ -7,19 +7,21 @@ _Static_assert(sizeof(FastLevel)==4,"Assembly table cell layout");
 FastLevel tba_levels[4][64] __attribute__((aligned(256)));
 _Static_assert(sizeof(tba_levels[0])==256,"Assembly table row layout");
 uint8_t tba_short;
+uint8_t tba_poll_interval=16;
 static int cache_gain[4];
 static uint8_t cache_duty[2],cache_wave[16],cache_shift;
 void tba_fast_mix(int16_t *out,unsigned int n);
 #endif
 static const uint8_t offsets[4]={0,5,10,15};
 static const uint8_t duties[4]={0x01,0x81,0x87,0x7e};
-static uint32_t step(unsigned int frequency, uint8_t wave) {
+static uint32_t step(unsigned int frequency, uint8_t wave,uint16_t rate) {
     /* Q16 sequencer positions per 16 kHz sample; divisions are frame-only. */
-    return (wave ? 8589934UL : 4294967UL)/(2048-frequency);
+    uint32_t numerator=wave?(rate==4000?34359738UL:rate==8000?17179869UL:8589934UL):(rate==4000?17179869UL:rate==8000?8589934UL:4294967UL);
+    return numerator/(2048-frequency);
 }
-void tba_apu_reset(TbaApu *a) { memset(a,0,sizeof(*a)); a->lfsr=0x7fff;
+void tba_apu_reset(TbaApu *a) { memset(a,0,sizeof(*a)); a->lfsr=0x7fff;a->rate=TBA_RATE;
 #ifdef __ez80__
-memset(tba_phase,0,sizeof(tba_phase));tba_noise=0x7fff;
+tba_poll_interval=TBA_RATE/1000;memset(tba_phase,0,sizeof(tba_phase));tba_noise=0x7fff;
 for(unsigned int i=0;i<4;i++)cache_gain[i]=-1;
 #endif
 }
@@ -37,10 +39,10 @@ void tba_apu_snapshot(TbaApu *a,const uint8_t regs[0x30],const uint8_t wave[16],
         if(!(status&(1<<i)))c->enabled=0;
         if(i<3) {
             unsigned int f=r[3]|((r[4]&7)<<8);
-            if(trigger||f!=c->shadow_frequency){c->shadow_frequency=f;c->frequency=f;c->step=step(f,i==2);}
+            if(trigger||f!=c->shadow_frequency){c->shadow_frequency=f;c->frequency=f;c->step=step(f,i==2,a->rate);}
         } else {
             static const uint8_t divs[8]={8,16,32,48,64,80,96,112};
-            a->channel[3].step=17179869UL/((uint32_t)divs[r[3]&7]<<(r[3]>>4));
+            a->channel[3].step=(17179869UL*(16000/a->rate))/((uint32_t)divs[r[3]&7]<<(r[3]>>4));
         }
         if(trigger) {
             c->enabled=!!(status&(1<<i));
@@ -74,7 +76,7 @@ static void sequencer(TbaApu *a) {
             if(a->sweep_shift&&a->sweep_period){
                 unsigned int next=a->sweep_down?c->frequency-delta:c->frequency+delta;
                 if(next>2047)c->enabled=0;
-                else {c->frequency=next;c->step=step(next,0);if(!a->sweep_down&&next+(next>>a->sweep_shift)>2047)c->enabled=0;}
+                else {c->frequency=next;c->step=step(next,0,a->rate);if(!a->sweep_down&&next+(next>>a->sweep_shift)>2047)c->enabled=0;}
             }
         }
     }
@@ -110,13 +112,13 @@ static int16_t mix_sample(TbaApu *a) {
     return (int16_t)mixed;
 }
 unsigned int tba_apu_frame_samples(TbaApu *a) {
-    a->sample_clock+=70224UL*TBA_RATE;
+    a->sample_clock+=70224UL*a->rate;
     unsigned int n=a->sample_clock>>22;a->sample_clock&=0x3fffff;return n;
 }
 
 int16_t tba_apu_sample(TbaApu *a) {
     int16_t s=mix_sample(a);a->tick+=512;
-    if(a->tick>=TBA_RATE){a->tick-=TBA_RATE;sequencer(a);}return s;
+    if(a->tick>=a->rate){a->tick-=a->rate;sequencer(a);}return s;
 }
 void tba_apu_render(TbaApu *a,int16_t *out,unsigned int n) {
     unsigned int total=n;
@@ -154,6 +156,18 @@ void tba_apu_render(TbaApu *a,int16_t *out,unsigned int n) {
     while(n--)*out++=mix_sample(a);
 #endif
     uint32_t clocks=a->tick+(uint32_t)total*512;
-    while(clocks>=TBA_RATE){clocks-=TBA_RATE;sequencer(a);}
+    while(clocks>=a->rate){clocks-=a->rate;sequencer(a);}
     a->tick=clocks;
+}
+
+void tba_apu_set_rate(TbaApu *a,uint16_t rate) {
+    if(rate!=4000&&rate!=8000&&rate!=16000)return;
+    a->tick=(uint32_t)a->tick*rate/a->rate;a->rate=rate;
+    for(unsigned int i=0;i<3;i++)a->channel[i].step=step(a->channel[i].frequency,i==2,rate);
+    static const uint8_t divs[8]={8,16,32,48,64,80,96,112};
+    uint8_t nr43=a->regs[18];
+    a->channel[3].step=(17179869UL*(16000/rate))/((uint32_t)divs[nr43&7]<<(nr43>>4));
+#ifdef __ez80__
+    tba_poll_interval=rate/1000;
+#endif
 }

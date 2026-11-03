@@ -33,6 +33,8 @@ _usb_GetDeviceEndpoint: jp 84
 _usb_SetEndpointFlags: jp 108
 .global _usb_GetFrameNumber
 _usb_GetFrameNumber: jp 117
+.global _usb_ScheduleControlTransfer
+_usb_ScheduleControlTransfer: jp 126
 .global _usb_ScheduleTransfer
 _usb_ScheduleTransfer: jp 129
     nop

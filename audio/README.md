@@ -1,39 +1,42 @@
-# TI-Boy CE USB audio — experimental prototype 5
+# TI-Boy CE USB audio — experimental prototype 6
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **TBAUD5.8xg**. This transport group sends both TIBUSB5 and TBUSB005
-   in one operation; it is not an on-calculator Group requiring ungrouping.
-   Alternatively transfer both files from the zip. Existing game AppVars are
-   reused; the installed LibLoad and USBDRVCE libraries must be archived.
-2. Exit the old emulator. Run **TIBUSB5**, then load your game.
-3. Quit TI Connect CE, reconnect the cable, and select **TI-Boy CE PCM5** on
-   Doomvision's updated `/usb` page in Chrome. For a raw timing capture, leave
-   the browser disconnected so the capture tool can claim the interface.
+1. Transfer **TBAUD6.8xg**, which sends both TIBUSB6 and TBUSB006. Existing game
+   AppVars and archived LibLoad / USBDRVCE are reused.
+2. Exit the old emulator, run **TIBUSB6**, then load your game.
+3. Quit TI Connect CE and connect **TI-Boy CE PCM6** on the updated Doomvision
+   `/usb` page. The default is **Fast · 4 kHz**. The website can change between
+   4, 8 and 16 kHz while the game runs; lower rates leave more CPU for gameplay.
+   All four sound channels and PCM generation remain on the calculator.
+4. The browser flushes startup backlog before playback and resets the queue
+   during a rate change. Expect a brief rebuffer when changing quality.
 
-## Verified failure and changes
+## Verification and CPU budget
 
-A direct live capture of **PCM4** measured ~38 chunks/s (~4,846 samples/s), with
-roughly 87 missing sequence numbers/s. The 38+87 total matches the intended
-125 chunks/s: audio was being generated but discarded before delivery. The
-browser then necessarily underruns. This is separate from earlier stale-core
-packaging; the PCM4 identity was read from the device itself.
+PCM5 was physically verified at ~125 chunks/s and zero missing chunks; the user
+confirmed continuous audio but game speed was below playable. This version
+reduces the default rate to 4 kHz and provides live quality selection. Native
+benchmarks cover 12 rate/noise combinations, each with 120 full four-channel
+frames matching the reference. At 4 kHz those cases average 2.5–3.6 ms per game
+frame, versus 6.8–9.5 ms at 16 kHz; real USB work and game emulation are additional.
+Pitch checks pass at all three rates. The 32/128-clock noise jumps are exact GF(2)
+transforms, checked against the reference, rather than approximated noise.
 
-This version services USB **inside the assembly sample loop** every 16 samples,
-not only between game events. It also polls during scanline rendering and grows
-the queued-transfer ring from 8 to 24 slots. Heavy noise generation uses an exact
-8-clock LFSR advance. Four sample tables use aligned cells to reduce lookup cost;
-DC rejection runs on the Mac, not in the calculator mixer. Game Boy playback uses
-a 128 ms priming buffer and a 320 ms queue cap; the piano receiver keeps its
-existing 64 ms / 200 ms behavior.
+Fast mode delivers 4,000 samples/s = 31.25 packets/s. Balanced mode is 8,000
+samples/s = 62.5 packets/s. High mode is 16,000 samples/s = 125 packets/s.
+Each packet carries its actual source rate. The browser only plays packets at
+the selected rate and clears old data at changes. Physical playable-speed and
+rate-control verification for PCM6 remains pending.
 
-The native checks compare 120 frames for each of eight noise settings against
-the portable reference and require >2,000 USB service calls during synthesis.
-Both ADL and Z80-mode bridge checks preserve both register banks, I, IX/IY and
-stack modes. Continuous physical PCM5 playback remains to be measured.
+Vendor control OUT (device recipient), request 0x51, wValue 4000/8000/16000,
+wIndex 0, zero payload selects the rate. The control callback acknowledges the
+request; the pending change applies at a frame boundary, preserving oscillator
+phase and envelope progress. The sender stops spending CPU on discarded audio
+when its transfer ring is full because the host is not reading.
 
 ## Current accuracy and performance limits
 
@@ -50,12 +53,10 @@ hardware quirks, sweep edge cases, wave-RAM access quirks and alias suppression
 need further work. A game that cannot sustain normal emulation speed can starve
 the audio queue; automatic frameskip may help.
 
-The initial all-C sample loop took about 120 ms per 268 samples at 48 MHz.
-Expanded tests now include sustained noise at extreme frequencies and both LFSR
-widths. The optimized mixer ranges from about 6.4 to 11.5 ms mean per 268 samples
-in those fixtures, with a 13.3 ms worst observed frame. This includes the USB
-service call path with an inactive test driver, but excludes actual hardware USB
-work and the rest of emulation. It is not a claim of end-to-end gameplay speed.
+The initial all-C sample loop took ~120 ms per 268 samples at 48 MHz. The native
+sample loop services USB once per millisecond of synthesized PCM. The tests
+require >2,000 service calls over each 120-frame fixture. No calculator ROM is
+needed for these isolated tests; the default non-USB build is unchanged.
 
 ## Integration
 

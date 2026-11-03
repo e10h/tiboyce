@@ -10,6 +10,12 @@ int main(void){TbaApu a;uint8_t r[0x30]={0},w[16]={0};unsigned int i,edges=0,tot
     r[4]&=0x7f;tba_apu_snapshot(&a,r,w,0x80);assert(!a.channel[0].enabled);
     tba_apu_reset(&a);for(i=0;i<10000;i++)total+=tba_apu_frame_samples(&a);
     assert(total==(uint32_t)((70224ULL*TBA_RATE*10000)>>22));
+    for(unsigned int rate=4000;rate<=16000;rate*=2){
+        tba_apu_reset(&a);tba_apu_set_rate(&a,rate);memset(r,0,sizeof(r));r[1]=0x80;r[2]=0xf0;r[3]=1547&255;r[4]=0x80|(1547>>8);r[20]=0x77;r[21]=0x11;
+        tba_apu_snapshot(&a,r,w,0x81);edges=0;prev=0;
+        for(i=0;i<rate;i++){int16_t v=tba_apu_sample(&a);if(v>0&&prev<=0)edges++;prev=v;}
+        assert(edges>=260&&edges<=264);
+    }
     /* Each channel must trigger from its own NRx4 register, with no cross-trigger. */
     for(unsigned int ch=0;ch<4;ch++){
         static const unsigned int base[4]={0,5,10,15};unsigned int b=base[ch];

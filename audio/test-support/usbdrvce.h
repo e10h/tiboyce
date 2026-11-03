@@ -3,7 +3,7 @@
 #include <wchar.h>
 typedef void *usb_endpoint_t;typedef void *usb_device_t;
 typedef int usb_error_t;typedef int usb_event_t;typedef int usb_transfer_status_t;
-enum {USB_SUCCESS,USB_HOST_CONFIGURE_EVENT,USB_DEVICE_DISCONNECTED_EVENT,USB_DEVICE_DISABLED_EVENT};
+enum {USB_SUCCESS,USB_HOST_CONFIGURE_EVENT,USB_DEVICE_DISCONNECTED_EVENT,USB_DEVICE_DISABLED_EVENT,USB_DEFAULT_SETUP_EVENT,USB_IGNORE};
 #define USB_SKIP_HUBS 0
 #define USB_AUTO_TERMINATE 0
 #define USB_TRANSFER_COMPLETED 0
@@ -19,3 +19,6 @@ void usb_Cleanup(void);void usb_HandleEvents(void);
 usb_device_t usb_FindDevice(void*,void*,int);usb_endpoint_t usb_GetDeviceEndpoint(void*,int);
 void usb_SetEndpointFlags(void*,int);unsigned int usb_GetFrameNumber(void);
 usb_error_t usb_ScheduleBulkTransfer(usb_endpoint_t,void*,size_t,usb_callback_t,void*);
+
+typedef struct {uint8_t bmRequestType,bRequest;uint16_t wValue,wIndex,wLength;} usb_control_setup_t;
+usb_error_t usb_ScheduleControlTransfer(usb_endpoint_t,const usb_control_setup_t*,void*,usb_callback_t,void*);
