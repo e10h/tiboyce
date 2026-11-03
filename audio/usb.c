@@ -20,13 +20,14 @@ static uint16_t position;
 static unsigned int last_usb_tick;
 static uint8_t clock_sync;
 typedef struct { uint8_t data[272],busy; } Slot;
-static Slot slots[8];
+#define SLOT_COUNT 24
+static Slot slots[SLOT_COUNT];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0203,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0204,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM4"};
+static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM5"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};
@@ -46,12 +47,20 @@ static void packet(void){unsigned int i;assembling[0]='D';assembling[1]='V';asse
     memcpy(assembling+4,&sequence,4);sequence++;
     assembling[8]=0x80;assembling[9]=0x3e;assembling[10]=assembling[11]=0;
     assembling[12]=128;assembling[13]=0;assembling[14]=4;assembling[15]=0;
-    for(i=0;i<8;i++)if(!slots[i].busy){Slot *s=&slots[i];memcpy(s->data,assembling,272);s->busy=1;
+    for(i=0;i<SLOT_COUNT;i++)if(!slots[i].busy){Slot *s=&slots[i];memcpy(s->data,assembling,272);s->busy=1;
         if(usb_ScheduleBulkTransfer(endpoint,s->data,272,complete,s)!=USB_SUCCESS)s->busy=0;
         break;
     }
 }
-void tba_poll(void){if(started)usb_HandleEvents();}
+#ifdef TBA_BENCH
+unsigned int tba_poll_calls;
+#endif
+void tba_poll(void){
+#ifdef TBA_BENCH
+    tba_poll_calls++;
+#endif
+    if(started)usb_HandleEvents();
+}
 void tba_frame(void){uint8_t regs[0x30]={0},wave[16];unsigned int i,n;
     if(!started)return;
     usb_HandleEvents();

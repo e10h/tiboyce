@@ -1569,6 +1569,13 @@ render_scanline_next:
 	    ; Advance to next scanline
 	   pop bc
 	   inc c
+#ifdef USB_AUDIO
+       push af
+       ld a,c
+       and 7
+       call z,AudioPoll
+       pop af
+#endif
 	   djnz render_scanline_loop
 	   ld (scanlineLUT_ptr),iy
 	   ld a,c

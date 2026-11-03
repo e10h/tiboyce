@@ -2,7 +2,10 @@
 #include <string.h>
 #ifdef __ez80__
 unsigned int tba_phase[4],tba_step[4],tba_noise;
-int tba_levels[4][32],tba_dc;
+typedef struct __attribute__((packed)) {int value;uint8_t pad;} FastLevel;
+_Static_assert(sizeof(FastLevel)==4,"Assembly table cell layout");
+FastLevel tba_levels[4][64] __attribute__((aligned(256)));
+_Static_assert(sizeof(tba_levels[0])==256,"Assembly table row layout");
 uint8_t tba_short;
 static int cache_gain[4];
 static uint8_t cache_duty[2],cache_wave[16],cache_shift;
@@ -16,7 +19,7 @@ static uint32_t step(unsigned int frequency, uint8_t wave) {
 }
 void tba_apu_reset(TbaApu *a) { memset(a,0,sizeof(*a)); a->lfsr=0x7fff;
 #ifdef __ez80__
-memset(tba_phase,0,sizeof(tba_phase));tba_noise=0x7fff;tba_dc=0;
+memset(tba_phase,0,sizeof(tba_phase));tba_noise=0x7fff;
 for(unsigned int i=0;i<4;i++)cache_gain[i]=-1;
 #endif
 }
@@ -102,8 +105,7 @@ static int16_t mix_sample(TbaApu *a) {
             mixed+=(int32_t)value*gain*16;
         }
     }
-    /* Remove mixer DC while retaining transients; leaves headroom for four channels. */
-    mixed-=a->dc;a->dc+=mixed>>9;
+    /* DC blocking runs in the computer audio worklet, outside the emulator CPU. */
     if(mixed>32767)mixed=32767;if(mixed< -32768)mixed= -32768;
     return (int16_t)mixed;
 }
@@ -125,6 +127,7 @@ void tba_apu_render(TbaApu *a,int16_t *out,unsigned int n) {
             TbaChannel *c=&a->channel[i];unsigned int gain=0;
             if(c->enabled){if(a->regs[21]&(1<<i))gain+=(a->regs[20]&7)+1;if(a->regs[21]&(16<<i))gain+=((a->regs[20]>>4)&7)+1;}
             gain*=16;tba_step[i]=c->enabled?c->step:0;
+            if(i==3&&!c->volume&&!c->envelope_up)tba_step[i]=0;
             int signature=i==2?(int)gain:(int)gain*c->volume;
             uint8_t duty=i<2?a->regs[offsets[i]+1]>>6:0;
             uint8_t shift=(a->regs[12]>>5)&3;
@@ -141,7 +144,7 @@ void tba_apu_render(TbaApu *a,int16_t *out,unsigned int n) {
                 if(i==2){uint8_t byte=a->wave[p>>1],shift=(a->regs[12]>>5)&3;value=shift?((int)((p&1)?byte&15:byte>>4)*2-15)>>(shift-1):0;}
                 else if(i==3)value=p?-(int)c->volume:c->volume;
                 else value=(duties[a->regs[offsets[i]+1]>>6]&(1<<p))?c->volume:-(int)c->volume;
-                tba_levels[i][p]=value*(int)gain;
+                tba_levels[i][p].value=value*(int)gain;
             }
         }
         tba_short=!!(a->regs[18]&8);

@@ -8,12 +8,10 @@
     ld (_tba_phase+3*\n),hl
     ld a,(_tba_phase+3*\n+2)
     and \mask
-    ld hl,0
+    add a,a
+    add a,a
+    ld hl,_tba_levels+256*\n
     ld l,a
-    ld h,3
-    mlt hl
-    ld de,_tba_levels+96*\n
-    add hl,de
     ld de,(hl)
     add iy,de
 .endm
@@ -41,6 +39,51 @@ _tba_fast_mix:
     ld hl,(_tba_noise)
     or a,b
     jr z,.Lnoise_done
+.Lnoise_blocks:
+    ld a,b
+    cp 8
+    jr c,.Lnoise_tail
+    ld a,(_tba_short)
+    or a,a
+    jr nz,.Lnoise_short8
+    ; Eight 15-bit clocks: (x >> 8) | (((x ^ (x >> 1)) & 255) << 7).
+    ld e,l
+    ld a,h
+    rrca
+    rr e
+    ld a,l
+    xor e
+    ld l,h
+    rra
+    ld h,a
+    jr nc,.Lnoise_block_next
+    set 7,l
+    jr .Lnoise_block_next
+.Lnoise_short8:
+    ; The 7-bit feedback sequence depends only on the current low seven bits.
+    ld a,l
+    and 127
+    ld de,0
+    ld e,a
+    ld hl,.Lshort8
+    add hl,de
+    ld a,(hl)
+    ld hl,0
+    srl a
+    ld h,a
+    ld l,a
+    jr nc,.Lnoise_block_next
+    set 7,l
+.Lnoise_block_next:
+    ld a,b
+    sub 8
+    ld b,a
+    jr nz,.Lnoise_blocks
+    jr .Lnoise_done
+.Lnoise_tail:
+    ld a,b
+    or a,a
+    jr z,.Lnoise_done
 .Lnoise:
     ld a,l
     rrca
@@ -67,33 +110,33 @@ _tba_fast_mix:
     ld (_tba_noise),hl
     ld a,l
     and 1
-    ld hl,0
+    add a,a
+    add a,a
+    ld hl,_tba_levels+768
     ld l,a
-    ld h,3
-    mlt hl
-    ld de,_tba_levels+288
-    add hl,de
     ld de,(hl)
     add iy,de
     push iy
     pop hl
-    ld de,(_tba_dc)
-    or a,a
-    sbc hl,de
     ld (ix),l
     ld (ix+1),h
     inc ix
     inc ix
-    ; Signed arithmetic right shift by nine, preserving the upper ADL byte.
-    ld a,h
-    add a,a
-    sbc a,a
-    ld l,h
-    ld h,a
-    sra h
-    rr l
-    add hl,de
-    ld (_tba_dc),hl
+    ; Device-mode FIFO work needs servicing during synthesis, not just between
+    ; game events. At 16 kHz this yields once per millisecond of generated PCM.
+    ld a,(.Lpoll_count)
+    dec a
+    ld (.Lpoll_count),a
+    jr nz,.Lno_poll
+    ld a,16
+    ld (.Lpoll_count),a
+    push ix
+    push iy
+    call _tba_poll
+    di
+    pop iy
+    pop ix
+.Lno_poll:
     ld hl,(.Lcount)
     dec hl
     ld (.Lcount),hl
@@ -105,3 +148,15 @@ _tba_fast_mix:
     ret
 .section .data.mix,"aw",@progbits
 .Lcount: .d24 0
+.Lpoll_count: .byte 16
+
+.section .rodata.noise,"a",@progbits
+.Lshort8:
+ .byte 0,193,67,130,134,71,197,4,12,205,79,142,138,75,201,8
+ .byte 24,217,91,154,158,95,221,28,20,213,87,150,146,83,209,16
+ .byte 48,241,115,178,182,119,245,52,60,253,127,190,186,123,249,56
+ .byte 40,233,107,170,174,111,237,44,36,229,103,166,162,99,225,32
+ .byte 96,161,35,226,230,39,165,100,108,173,47,238,234,43,169,104
+ .byte 120,185,59,250,254,63,189,124,116,181,55,246,242,51,177,112
+ .byte 80,145,19,210,214,23,149,84,92,157,31,222,218,27,153,88
+ .byte 72,137,11,202,206,15,141,76,68,133,7,198,194,3,129,64

@@ -15,11 +15,15 @@ if args.cemu:
     core=args.cemu.resolve()/'core'
     run(['make','-C',core,'-j4','CC=clang','CFLAGS=-O3 -std=gnu11 -fPIC'],stdout=subprocess.DEVNULL)
     run(['clang','-O2','-I'+str(core),'-I'+str(out),root/'tools/apu-cycles.c',core/'libcemucore.a','-o',out/'cycles','-framework','IOKit','-framework','CoreFoundation'])
-    result=run([out/'cycles',out/'module.bin',out/'native.pcm'],capture_output=True,text=True).stdout
     run(['cc','-O2',root/'audio/apu.c',root/'audio/bench.c','-o',out/'reference'])
-    ref=run([out/'reference'],capture_output=True).stdout
-    assert ref==(out/'native.pcm').read_bytes(),'Native mixer differs from reference'
-    print(result,end='');print('120 four-channel frames: native PCM is byte-identical to the C reference.')
-    (out/'result.txt').write_text(result+'120 four-channel frames: PCM parity passed.\n')
+    results=[]
+    for setting in [0x00,0x08,0x07,0x0f,0x10,0x18,0x35,0xff]:
+        result=run([out/'cycles',out/'module.bin',out/f'native-{setting:02x}.pcm',hex(setting)],capture_output=True,text=True).stdout
+        ref=run([out/'reference',hex(setting)],capture_output=True).stdout
+        assert ref==(out/f'native-{setting:02x}.pcm').read_bytes(),f'Native mixer differs for NR43={setting:02x}'
+        line=f'NR43={setting:02x}: '+result
+        print(line,end='');results.append(line)
+    print('All 8 noise settings: 120 four-channel frames each match the C reference.')
+    (out/'result.txt').write_text(''.join(results)+'All noise-setting PCM parity checks passed.\n')
     # Restore the normal module: benchmark functions are not included in releases.
     run(['python3',root/'tools/build-audio.py'])

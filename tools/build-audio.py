@@ -10,7 +10,7 @@ cc=ce/'bin/ez80-clang';bin=ce/'binutils/bin';objects=[]
 bench='--bench' in sys.argv
 for name in ['apu','usb']+(['bench'] if bench else []):
     asm=out/(name+'.s');obj=out/(name+'.o')
-    run([cc,'-S','-nostdinc','-isystem',ce/'include','-D__TICE__=1','-fno-autolink','-fno-addrsig','-mllvm','-z80-gas-style','-Os','-fno-omit-frame-pointer','-ffunction-sections','-fdata-sections',root/'audio'/(name+'.c'),'-o',asm])
+    run([cc,'-S','-nostdinc','-isystem',ce/'include','-D__TICE__=1',*(['-DTBA_BENCH=1'] if bench else []),'-fno-autolink','-fno-addrsig','-mllvm','-z80-gas-style','-Os','-fno-omit-frame-pointer','-ffunction-sections','-fdata-sections',root/'audio'/(name+'.c'),'-o',asm])
     run([bin/'z80-none-elf-as','-march=ez80+full',asm,'-o',obj]);objects.append(obj)
 run([bin/'z80-none-elf-as','-march=ez80+full',root/'audio/mix.S','-o',out/'mix.o'])
 objects.append(out/'mix.o')
