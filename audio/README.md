@@ -1,24 +1,26 @@
-# TI-Boy CE USB audio — experimental prototype 1
+# TI-Boy CE USB audio — experimental prototype 2
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **both** `TIBOYUSB.8xp` and `TBUSBDat.8xv` from `build/usb-audio/`.
+1. Transfer **both** `TIBUSB2.8xp` and `TBUSBDat.8xv` from `build/usb-audio/`.
    These have separate names from the stock launcher/core. Existing converted
    game AppVars are reused. LibLoad and USBDRVCE must already be installed and
    archived (the same libraries used by DVUSB6).
-2. Run **TIBOYUSB** and load your game. The emulator initializes USB when the
+2. Run **TIBUSB2** and load your game. The emulator initializes USB when the
    game starts; reconnect the USB cable after starting the game if needed.
 3. Close TI Connect CE and any native Doomvision receiver. Open the updated
    Doomvision `/usb` page in Chrome on Mac, click Connect calculator, choose
-   **TI-Boy CE PCM1**, then Connect. The mode should read **Game Boy**.
+   **TI-Boy CE PCM2**, then Connect. The mode should read **Game Boy**.
 4. Exiting emulation or entering a menu cleans up USB before TI-OS file calls.
    After resuming, reconnect from the browser if it disconnected.
 
-This is not yet verified with a physical calculator running a game. Do not
-interpret the isolated mixer benchmark as end-to-end gameplay validation.
+Prototype 1 ran a game and streamed on a physical calculator, but its fixed audio
+sample budget per emulated frame starved browser playback when the game slowed.
+Prototype 2 generates samples from elapsed USB SOF time instead. Physical
+verification of continuous playback with this change is still pending.
 
 ## Current accuracy and performance limits
 
@@ -54,6 +56,7 @@ match the portable reference byte for byte.
   image. Module BSS is embedded and allocated with that image, not in TI-Boy's
   rendering/ROM-cache SafeRAM. USBDRVCE uses its dedicated usbArea and OS heap.
 - Init occurs after emulator hardware configuration, frame service at VBlank,
+  with sample generation paced by the USB frame counter rather than game FPS,
   cleanup before state/file operations and hardware restoration.
 
 ## Build / verify

@@ -8,6 +8,8 @@ out=root/'build/audio';out.mkdir(parents=True,exist_ok=True)
 def run(cmd,**kwargs):return subprocess.run([str(x) for x in cmd],check=True,**kwargs)
 run(['cc','-O2','-Wall','-Wextra',root/'audio/apu.c',root/'audio/test-apu.c','-o',out/'test-apu'])
 run([out/'test-apu'])
+run(['cc','-O2','-Wall','-Wextra','-DTBA_HOST_TEST','-I'+str(root/'audio/test-support'),root/'audio/apu.c',root/'audio/usb.c',root/'audio/test-usb-clock.c','-o',out/'test-usb-clock'])
+run([out/'test-usb-clock'])
 if args.cemu:
     run(['python3',root/'tools/build-audio.py','--bench'])
     core=args.cemu.resolve()/'core'
