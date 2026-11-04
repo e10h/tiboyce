@@ -10,6 +10,8 @@ extern uint8_t tba_test_wave[16],tba_test_status;
 #define WAVE_RAM ((volatile uint8_t*)0xd4ff30)
 #define APU_STATUS (*(volatile uint8_t*)0xd4ff26)
 #endif
+/* C/USB calls must never borrow the emulator/JIT stack. */
+uint8_t tba_call_stack[2048];
 uint8_t tba_loaded;
 volatile uint8_t *tba_regs_ptr;
 static TbaApu apu;
@@ -21,14 +23,14 @@ static unsigned int last_usb_tick;
 static uint8_t clock_sync;
 static uint16_t pending_rate;
 typedef struct { uint8_t data[272],busy; } Slot;
-#define SLOT_COUNT 24
+#define SLOT_COUNT 20
 static Slot slots[SLOT_COUNT];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0206,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0207,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM7"};
+static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM8"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};

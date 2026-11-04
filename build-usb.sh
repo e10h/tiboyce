@@ -3,7 +3,7 @@ set -eu
 cd -- "$(dirname -- "$0")"
 python3 tools/build-audio.py
 mkdir -p build/usb-audio
-spasm -E -A -DUSB_AUDIO -DUSB_CORE_NAME='"TBUSB007"' -DVERSION='"USB audio prototype 7"' tiboyce.asm build/usb-audio/TBUSB007.8xv
-spasm -E -A -DUSB_AUDIO -DUSB_CORE_NAME='"TBUSB007"' launcher.asm build/usb-audio/TIBUSB7.8xp
+spasm -E -A -DUSB_AUDIO -DUSB_CORE_NAME='"TBUSB008"' -DVERSION='"USB audio prototype 8"' tiboyce.asm build/usb-audio/TBUSB008.8xv
+spasm -E -A -DUSB_AUDIO -DUSB_CORE_NAME='"TBUSB008"' launcher.asm build/usb-audio/TIBUSB8.8xp
 
 python3 tools/package-audio.py

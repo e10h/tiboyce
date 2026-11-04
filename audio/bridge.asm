@@ -14,8 +14,11 @@
     push bc
     push de
     push hl
+    ld (audio_saved_sp),sp
+    ld sp,tba_call_stack+2048
     call target
     di
+    ld sp,(audio_saved_sp)
     pop hl
     pop de
     pop bc
@@ -56,3 +59,7 @@ AudioPollZ80:
 AudioPoll:
     AUDIO_CALL(tba_poll)
     ret
+
+; Calls are synchronous; driver callbacks stay on the dedicated C stack.
+audio_saved_sp:
+    .dl 0

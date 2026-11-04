@@ -21,6 +21,8 @@ asic_rev_t gui_handle_reset(const boot_ver_t*v,asic_rev_t l,asic_rev_t d,emu_dev
 
 static void load(const char *path,unsigned address){FILE*f=fopen(path,"rb");assert(f);fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);assert(fread(phys_mem_ptr(address,n),1,n,f)==(size_t)n);fclose(f);}
 static void check(int z80){
+    memset(phys_mem_ptr(0xd17d00,64),0xa5,64);
+    memset(phys_mem_ptr(tba_call_stack-16,16),0x5a,16);
     cpu_clear_signals();cpu.halted=false;cpu.ADL=cpu.L=cpu.IL=!z80;cpu.MADL=true;cpu.IEF1=cpu.IEF2=false;
     cpu.registers.AF=0xa5d7;cpu.registers._AF=0x5a29;
     cpu.registers.BC=0x123456;cpu.registers.DE=0x234567;cpu.registers.HL=0x345678;
@@ -35,6 +37,9 @@ static void check(int z80){
 #define SAME(x) assert(cpu.registers.x==before.x)
     SAME(AF);SAME(_AF);SAME(BC);SAME(DE);SAME(HL);SAME(_BC);SAME(_DE);SAME(_HL);SAME(IX);SAME(IY);SAME(I);SAME(MBASE);SAME(SPS);
     assert(cpu.registers.SPL==before.SPL+(z80?0:3));
+    for(unsigned i=0;i<64;i++)if(mem_peek_byte(0xd17d00+i)!=0xa5){fputs("Emulator stack guard overwritten by C call\n",stderr);exit(5);}
+    for(unsigned i=0;i<16;i++)if(mem_peek_byte(tba_call_stack-16+i)!=0x5a){fputs("Dedicated C stack guard overwritten\n",stderr);exit(6);}
 }
-int main(int argc,char**argv){assert(argc==3);asic_init();mem.flash.size=0x400000;mem.flash.block=calloc(mem.flash.size,1);asic_reset();control.stackLimit=0;control.protectedStart=control.protectedEnd=0;
-load(argv[1],0xd1a881);load(argv[2],0xd48000);check(0);check(1);puts("ADL and Z80 CALL.IL USB poll bridges preserve both register banks, I, IX/IY and stack modes.");return 0;}
+int main(int argc,char**argv){assert(argc==4);asic_init();mem.flash.size=0x400000;mem.flash.block=calloc(mem.flash.size,1);asic_reset();control.stackLimit=0;control.protectedStart=control.protectedEnd=0;
+load(argv[1],0xd1a881);load(argv[2],0xd48000);check(0);check(1);
+load(argv[3],0xd18080);mem_poke_byte(tba_poll,0xc3);mem_poke_word(tba_poll+1,0xd18080,true);check(0);check(1);puts("ADL and Z80 CALL.IL USB poll bridges preserve both register banks, I, IX/IY and stack modes; 1536-byte C calls leave emulator stack guards intact.");return 0;}

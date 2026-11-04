@@ -1,17 +1,31 @@
-# TI-Boy CE USB audio — experimental prototype 7
+# TI-Boy CE USB audio — experimental prototype 8
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **TBAUD7.8xg**, which sends both TIBUSB7 and TBUSB007. Existing game
+1. Transfer **TBAUD8.8xg**, which sends both TIBUSB8 and TBUSB008. Existing game
    AppVars and archived LibLoad / USBDRVCE are reused.
-2. Exit the old emulator, run **TIBUSB7**, then load your game.
-3. Quit TI Connect CE and connect **TI-Boy CE PCM7** on Doomvision `/usb` in
+2. Exit the old emulator, run **TIBUSB8**, then load your game.
+3. Quit TI Connect CE and connect **TI-Boy CE PCM8** on Doomvision `/usb` in
    Chrome. Fast 4 kHz is the default. PCM7 enables live 8/16 kHz choices; PCM6
    remains accepted in Fast-only mode. Higher rates cost more game CPU time.
 4. The browser discards startup backlog and briefly rebuffers on a rate change.
+
+## Stack isolation (PCM8)
+
+The user reported Super Mario Bros. Deluxe clearing calculator RAM on entry
+into level 1 in TIBUSB7, while original TIBOYCE works. PCM8 gives all bridged
+C/USB calls a dedicated 2 KiB stack in the allocated audio module. The old
+bridge borrowed the emulator/JIT stack. A ROM-free negative-control test
+shows a 1536-byte C call overwriting the emulator stack guard with that bridge;
+the isolated bridge preserves the guard in both ADL and Z80 CALL.IL modes,
+while restoring both register banks, I, IX/IY and both stack pointers.
+This demonstrates a stack-safety defect; it does not yet establish the exact
+cause of the Deluxe hardware crash. The new firmware needs that hardware test.
+The TX ring has twenty slots to keep the core and transport group within
+TI variable size limits after reserving the dedicated stack.
 
 ## Verification and CPU budget
 
