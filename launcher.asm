@@ -121,6 +121,9 @@ MagicCheckLoop:
 	  ld (asm_prgm_size),bc
 	 pop de
 	 ex (sp),hl
+#ifdef USB_DIAGNOSTIC_MODE
+    ld a,USB_DIAGNOSTIC_MODE
+#endif
 	 ret
 	
 ErrorInvalid:

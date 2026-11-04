@@ -22,6 +22,6 @@ exports={parts[2]:int(parts[0],16) for line in symbols.splitlines() if len(parts
 end=exports['_module_end'];base=0xd1e881
 # BSS is explicitly embedded in TI-Boy's allocated user-memory image.
 p=out/'module.bin';p.write_bytes(p.read_bytes().ljust(end-base,b'\0'))
-(out/'symbols.inc').write_text('\n'.join(f'{key[1:]} = ${exports[key]:06X}' for key in ['_tba_resolve','_tba_start','_tba_stop','_tba_frame','_tba_regs_ptr','_tba_poll','_tba_call_stack'])+'\n')
+(out/'symbols.inc').write_text('\n'.join(f'{key[1:]} = ${exports[key]:06X}' for key in ['_tba_resolve','_tba_start','_tba_stop','_tba_frame','_tba_regs_ptr','_tba_poll','_tba_call_stack','_tba_disable_usb'])+'\n')
 (out/'symbols.h').write_text('\n'.join(f'#define SYM{key} 0x{value:x}u' for key,value in exports.items() if key.startswith('_tba_') and '.' not in key)+'\n')
 print(f'Audio module: {end-base} bytes (including state and USB buffers)')

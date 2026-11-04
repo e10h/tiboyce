@@ -3,15 +3,16 @@
 #include <string.h>
 #include "usbdrvce.h"
 uint8_t tba_test_wave[16],tba_test_status;
-extern uint8_t tba_loaded;extern volatile uint8_t *tba_regs_ptr;
+extern uint8_t tba_loaded,tba_disable_usb;extern volatile uint8_t *tba_regs_ptr;
 void tba_start(void);void tba_frame(void);void tba_stop(void);void tba_poll(void);
 static usb_error_t (*event_handler)(usb_event_t,void*,void*);
 static unsigned int expected_rate=16000;
 static unsigned int tick;static uint32_t packets,completed;
 static int async_mode,legacy_control_callback;
+static unsigned init_calls;
 static struct {usb_endpoint_t ep;size_t left;usb_callback_t cb;void *arg;} q[32];
 static unsigned int qread,qwrite;
-usb_error_t usb_Init(usb_error_t (*event)(usb_event_t,void*,void*),void *a,const usb_standard_descriptors_t *d,unsigned int f){(void)a;(void)d;(void)f;event_handler=event;event(USB_HOST_CONFIGURE_EVENT,0,0);return 0;}
+usb_error_t usb_Init(usb_error_t (*event)(usb_event_t,void*,void*),void *a,const usb_standard_descriptors_t *d,unsigned int f){(void)a;(void)d;(void)f;init_calls++;event_handler=event;event(USB_HOST_CONFIGURE_EVENT,0,0);return 0;}
 void usb_Cleanup(void){qread=qwrite=0;}
 void usb_HandleEvents(void){if(async_mode&&qread!=qwrite){
     unsigned int i=qread%32;
@@ -54,6 +55,9 @@ for(unsigned int legacy=0;legacy<2;legacy++)for(unsigned int rate=4000;rate<=160
     for(unsigned int frame=0;frame<200;frame++){unsigned int ms=delays[frame%5];elapsed+=ms;tick=(tick+ms*8)&0x3fff;tba_frame();}
     assert(packets*128<=elapsed*rate/1000);assert(elapsed*rate/1000-packets*128<128);tba_stop();
 }
+tba_stop();unsigned before_init=init_calls;
+tba_disable_usb=1;tba_start();tba_poll();tba_frame();assert(init_calls==before_init);tba_stop();tba_disable_usb=0;
+puts("Diagnostic CALL mode performs no USB initialization or servicing.");
 puts("Vendor rate control with both callback layouts and 4/8/16 kHz packet timing passed.");
 puts("USB FIFO model: frame-only polls starve; 1 ms service sustains >120 chunks/s.");
 puts("Variable 16–45 ms game frames and USB counter wrap: 16,000 PCM samples per elapsed second passed.");}

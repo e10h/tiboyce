@@ -1,17 +1,41 @@
-# TI-Boy CE USB audio — experimental prototype 8
+# TI-Boy CE USB audio — experimental prototype 10
 
 This fork generates 16 kHz mono PCM on the calculator and sends it to Doomvision's
 browser USB receiver. It does not stream key events or play a prerecorded song.
 
 ## Try it
 
-1. Transfer **TBAUD8.8xg**, which sends both TIBUSB8 and TBUSB008. Existing game
+1. Transfer **TBAUD10.8xg**, which sends both TIBUSB10 and TBUSB010. Existing game
    AppVars and archived LibLoad / USBDRVCE are reused.
-2. Exit the old emulator, run **TIBUSB8**, then load your game.
-3. Quit TI Connect CE and connect **TI-Boy CE PCM8** on Doomvision `/usb` in
+2. Exit the old emulator, run **TIBUSB10**, then load your game.
+3. Quit TI Connect CE and connect **TI-Boy CE PCM10** on Doomvision `/usb` in
    Chrome. Fast 4 kHz is the default. PCM7 enables live 8/16 kHz choices; PCM6
    remains accepted in Fast-only mode. Higher rates cost more game CPU time.
 4. The browser discards startup backlog and briefly rebuffers on a rate change.
+
+## GBC state placement (PCM10)
+
+Super Mario Bros. Deluxe crashed entering level 1 in PCM7/8, including with
+USB unplugged. The stock emulator works. Diagnostic CALL mode (C bridges
+active, no usb_Init) crashed; SAFE mode (C calls bypassed) eventually reported
+a runtime error. The 2 KiB stack isolation in PCM8 did not resolve this.
+
+The USB-expanded program and loaded driver place GBC WRAM at a different RAM
+address. The native SVBK handler updates only pointer H bytes, including the
+direct WRAM stack pointer's IYH, and does not carry into the upper address byte.
+For example, WRAM at D29210 misroutes banks 4 and 7 into earlier RAM containing
+native emulator/audio memory. PCM10 aligns startup allocation so predicted
+GBC WRAM starts below offset 6000 of a 64 KiB region. Unsafe placements are
+padded to the next 64 KiB boundary, keeping normal, mirrored and direct-stack
+bank mappings valid. The original 16-byte VRAM alignment is preserved.
+
+The ROM-free native regression executes the real startup alignment helper and
+SVBK machine code. It reproduces the old bad mapping, then checks all eight
+bank values in normal/direct-stack modes at all 4096 aligned placements:
+65,536 bank checks pass. Allocation failure still follows the existing error
+path. Hardware verification of the Deluxe level transition is pending.
+Padding uses additional runtime RAM, not additional track storage; if a game
+cannot fit, startup reports insufficient RAM rather than allowing bank aliases.
 
 ## Stack isolation (PCM8)
 
@@ -22,8 +46,8 @@ bridge borrowed the emulator/JIT stack. A ROM-free negative-control test
 shows a 1536-byte C call overwriting the emulator stack guard with that bridge;
 the isolated bridge preserves the guard in both ADL and Z80 CALL.IL modes,
 while restoring both register banks, I, IX/IY and both stack pointers.
-This demonstrates a stack-safety defect; it does not yet establish the exact
-cause of the Deluxe hardware crash. The new firmware needs that hardware test.
+This demonstrates a stack-safety defect; GBC bank placement above was a
+separate confirmed mapping defect.
 The TX ring has twenty slots to keep the core and transport group within
 TI variable size limits after reserving the dedicated stack.
 
@@ -104,6 +128,7 @@ is not `~/CEdev`, and put `spasm` on PATH. Run:
 bash build-usb.sh
 python3 tools/test-audio.py
 python3 tools/test-audio.py --cemu /path/to/CEmu
+python3 tools/test-gbc-banks.py --cemu /path/to/CEmu
 ```
 
 The CEmu check runs the real eZ80 mixer without a calculator ROM and compares its

@@ -1,9 +1,16 @@
 Startup:
+#ifdef USB_DIAGNOSTIC
+    ld (audio_diagnostic_mode),a
+    ld (tba_disable_usb),a
+#endif
 	ld bc,-arc_start
 	add hl,bc
 	ld (ArcBase),hl
 #ifdef USB_AUDIO
 	call AudioResolve
+#ifdef USB_DIAGNOSTIC
+    call AudioDiagnosticConfigure
+#endif
 #endif
 
 	; Align user memory so GBC VRAM is 16-byte aligned
@@ -17,6 +24,11 @@ Startup:
 	ld e,a
 	ACALL(InsertMemSafe)
 	jr c,_
+
+#ifdef USB_AUDIO
+    ACALL(AlignGbcStateBanks)
+    jr c,_
+#endif
 
 	; Load the main config file over the defaults
 	ACALL(LoadConfigFile)
@@ -4561,4 +4573,31 @@ StateSlotMessage:
 	
 StateNotFoundMessage:
 	.db "State %c not found",0
-	
+
+#ifdef USB_AUDIO
+; Byte-only SVBK pointer updates require WRAM/mirror bases and direct stack
+; pointers to remain representable without carry into the upper byte.
+; Run after original 16-byte alignment, before allocating either config.
+AlignGbcStateBanks:
+    ld hl,(asm_prgm_size)
+    ld bc,userMem+2+config_size+2+config_size+3+wram_gbc_start_offset
+    add hl,bc
+    ld a,h
+    cp $60
+    jr nc,AlignGbcStateNeedsPadding
+    or a
+    ret
+AlignGbcStateNeedsPadding:
+    ld bc,0
+    ld b,h
+    ld c,l
+    ld hl,$10000
+    or a
+    sbc hl,bc
+    ex de,hl
+    ld hl,(asm_prgm_size)
+    ld bc,userMem
+    add hl,bc
+    ACALL(InsertMemSafe)
+    ret
+#endif

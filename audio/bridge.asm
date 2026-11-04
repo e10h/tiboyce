@@ -63,3 +63,27 @@ AudioPoll:
 ; Calls are synchronous; driver callbacks stay on the dedicated C stack.
 audio_saved_sp:
     .dl 0
+
+#ifdef USB_DIAGNOSTIC
+; All launchers use the same allocated core and loaded driver. Mode 2 removes
+; C calls; mode 1 keeps them but suppresses usb_Init; mode 0 is the full path.
+audio_diagnostic_mode:
+    .db 0
+AudioDiagnosticConfigure:
+    push af
+    ld a,(audio_diagnostic_mode)
+    cp 2
+    jr nz,AudioDiagnosticDone
+    ld a,$C9
+    ld (AudioStart),a
+    ld (AudioStop),a
+    ld (AudioFrame),a
+    ld (AudioPoll),a
+    ld a,$5B
+    ld (AudioPollZ80),a
+    ld a,$C9
+    ld (AudioPollZ80+1),a
+AudioDiagnosticDone:
+    pop af
+    ret
+#endif

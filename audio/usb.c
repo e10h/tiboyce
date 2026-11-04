@@ -12,7 +12,7 @@ extern uint8_t tba_test_wave[16],tba_test_status;
 #endif
 /* C/USB calls must never borrow the emulator/JIT stack. */
 uint8_t tba_call_stack[2048];
-uint8_t tba_loaded;
+uint8_t tba_loaded,tba_disable_usb;
 volatile uint8_t *tba_regs_ptr;
 static TbaApu apu;
 static usb_endpoint_t endpoint;
@@ -28,9 +28,9 @@ static Slot slots[SLOT_COUNT];
 static uint8_t assembling[272];
 static int16_t frame_pcm[268];
 static const uint8_t config[25]={9,2,25,0,1,1,0,128,50,9,4,0,0,1,255,68,1,0,7,5,129,2,64,0,0};
-static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0207,0,1,0,1};
+static const usb_device_descriptor_t device={18,1,0x0200,0,0,0,64,0x0451,0xe008,0x0209,0,1,0,1};
 static const usb_configuration_descriptor_t *configs[]={(const usb_configuration_descriptor_t*)config};
-static const usb_string_descriptor_t product={.bLength=30,.bDescriptorType=3,.bString=L"TI-Boy CE PCM8"};
+static const usb_string_descriptor_t product={.bLength=32,.bDescriptorType=3,.bString=L"TI-Boy CE PCM10"};
 static const usb_string_descriptor_t lang={.bLength=4,.bDescriptorType=3,.bString={0x0409}};
 static const usb_string_descriptor_t *strings[]={&product};
 static const usb_standard_descriptors_t descriptors={&device,configs,&lang,1,strings};
@@ -60,7 +60,7 @@ void tba_stop(void){if(started){usb_Cleanup();started=0;}endpoint=NULL;}
 void tba_start(void){
     tba_apu_reset(&apu);tba_apu_set_rate(&apu,4000);pending_rate=0;sequence=0;position=0;endpoint=NULL;
     memset(slots,0,sizeof(slots));memset(assembling,0,sizeof(assembling));
-    if(tba_loaded&&!started)started=usb_Init(event,NULL,&descriptors,USB_DEFAULT_INIT_FLAGS)==USB_SUCCESS;
+    if(tba_loaded&&!started&&!tba_disable_usb)started=usb_Init(event,NULL,&descriptors,USB_DEFAULT_INIT_FLAGS)==USB_SUCCESS;
 }
 static void packet(void){unsigned int i;assembling[0]='D';assembling[1]='V';assembling[2]='U';assembling[3]='1';
     memcpy(assembling+4,&sequence,4);sequence++;
